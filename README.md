@@ -1,0 +1,197 @@
+# jev-preview
+
+A terminal sandbox for the [TypeSafe](https://docs.typesafe.ai) System One API
+(`POST https://api.typesafe.ai/v1/systemone`) — write a context, build the questions
+in a form rather than by hand, send, and read the answers as probability bars instead
+of raw JSON.
+
+Every request you work on is saved as a JSON file holding its name, creation date,
+request body, and the full history of responses it has received.
+
+```
+┌─ context ──────────┬─ response ─────────┐
+│  the `state` you   │  answers, rendered │
+│  send   (1/3)      │  with probability  │
+├─ questions ────────┤  bars, then the    │
+│  the `questions`   │  raw JSON          │
+│  map, as a form    │                    │
+│         (2/3)      │                    │
+└────────────────────┴────────────────────┘
+```
+
+## Install
+
+```sh
+pipx install jev-preview     # or: uv tool install jev-preview
+jev-preview
+```
+
+The first run asks for your TypeSafe API key and stores it in your user config
+directory (`~/.config/jev-preview/config.json` on Linux), readable only by you.
+Declining the prompt exits without writing anything. Press <kbd>ctrl</kbd>+<kbd>k</kbd>
+at any time to change it.
+
+To set the key without opening the TUI:
+
+```sh
+jev-preview --set-key sk-…
+pbpaste | jev-preview --set-key -     # or read it from stdin
+jev-preview --show-config             # where everything lives
+```
+
+`TYPESAFE_API_KEY` is honoured if you would rather keep the key in your environment;
+it wins over the config file and is never written to disk.
+
+## Keys
+
+### Normal mode
+
+| key | action |
+| --- | --- |
+| `h` `j` `k` `l` or arrows | move between panes |
+| `e` | edit the focused pane here |
+| `E` | edit it in `$EDITOR` instead |
+| `enter` | send the request |
+| `[` / `]` | previous / next response in history |
+| `o` | open the requests catalogue |
+| `n` | start a new, empty request |
+| `c` | copy the current request (context + questions, no response history) |
+| `r` | rename the current request |
+| `d` | delete the current request |
+| `m` | cycle model (`jev-latest` → `jev-preview` → `jev-1.13.0`) |
+| `ctrl+k` | change the API key |
+| `?` | help |
+| `q` | quit |
+
+In the response pane, `j`/`k` scroll (there is no pane above or below it), `g`/`G` jump
+to top and bottom, and `pgup`/`pgdn` page through. In the catalogue, typing filters by
+name or filename, and `ctrl+d` deletes the highlighted request after a confirmation.
+
+### Edit mode
+
+`e` opens the focused pane for editing; `esc` returns to normal mode and saves. The
+border turns green and the title gains a `✎ esc` marker.
+
+**context** is a plain text buffer: every key types, arrows move the cursor, `enter`
+inserts a newline.
+
+**questions** is a form, not a text buffer. Each question is a card with an id field, a
+type dropdown, an instructions box, and criteria widgets that follow the type — so the
+structure is chosen, and only free text is typed:
+
+| type | criteria |
+| --- | --- |
+| `noul` | optional descriptions of what *true* and *false* mean |
+| `choice` | option rows: a name and an optional description, `+ option` to add |
+| `score` | ordered level rows, numbered as the API reports them, `+ level` to add |
+
+`tab`/`shift+tab` and the arrow keys both cycle the fields, and stay inside the form;
+`enter` or `space` activates a button, including opening the type dropdown. `+ question`
+appends a card and `✕ remove` deletes one. Switching type keeps what the other types
+held, so flipping `choice → score → choice` loses nothing.
+
+Pressing `e` with no questions yet starts one for you, with its generated id selected so
+typing renames it; leaving with `esc` before filling anything in discards it again.
+
+Problems are reported live — a missing id, a duplicate id, absent instructions, a choice
+with fewer than two options, a score with fewer than two levels — in the pane title and
+under the summary, and `enter` refuses to send until they are gone.
+
+`ctrl+h/j/k/l` are deliberately unbound, so they pass straight through to a
+terminal-level splits navigator (kitty's `pass_keys.py`, tmux, and friends) and still
+move you between terminal windows from inside jev.
+
+## Editing the panes
+
+Edits are written to disk when you leave edit mode, about a second and a half after you
+stop typing, and again on send and on quit — there is no explicit save.
+
+**context** is the request's `state`. It is plain text, and stays plain text unless what
+you type parses as a JSON object or array — so both `a support ticket like this` and a
+structured chat log work.
+
+**questions** is the `questions` map. The form covers the documented shapes; a question
+using the [advanced structure](https://docs.typesafe.ai/primitives/advanced) the API
+also accepts — an object or array for `instructions`, say — is shown read-only and
+carried through byte-for-byte rather than flattened. Edit those with `E`.
+
+`E` hands the focused pane to `$EDITOR`: the raw text for context, the raw `questions`
+JSON for questions. If that JSON does not parse, it is kept verbatim in the file as
+`draft_questions` — the form refuses to open over it, and `E` reopens your text to fix.
+
+The three question types (see [primitives](https://docs.typesafe.ai/primitives)):
+
+```json
+{
+  "is_urgent":   { "type": "noul",   "instructions": "Does this convey urgency?" },
+  "department":  { "type": "choice", "instructions": "Which team should handle this?",
+                   "criteria": { "billing": "Payments", "technical": "Bugs", "sales": "Pricing" } },
+  "frustration": { "type": "score",  "instructions": "How frustrated is the customer?",
+                   "criteria": ["Calm", "Frustrated", "Very angry"] }
+}
+```
+
+## Naming
+
+A new request names itself after the first line of its context and keeps following it,
+renaming its file as you go (`auto_name: true` in the file). `r` gives it a real name,
+which pins both the name and the filename from then on. A copy is born with the pinned
+name `Copy of …`.
+
+## Where things are stored
+
+| what | where | override |
+| --- | --- | --- |
+| config (API key, base URL, models) | `~/.config/jev-preview/config.json` | `JEV_CONFIG_DIR` |
+| saved requests | `~/.local/share/jev-preview/requests/` | `JEV_REQUESTS_DIR`, `--requests-dir` |
+
+macOS and Windows get their own platform-appropriate locations via
+[platformdirs](https://pypi.org/project/platformdirs/). The config file is written with
+`0600` permissions; a key taken from `TYPESAFE_API_KEY` is never written at all.
+
+```json
+{
+  "api_key": "sk-…",
+  "base_url": "https://api.typesafe.ai/v1",
+  "models": ["jev-latest", "jev-preview", "jev-1.13.0"],
+  "timeout": 60.0
+}
+```
+
+Everything but `api_key` is optional; edit the file to point at a different deployment
+or to change the models `m` cycles through.
+
+### Saved request format
+
+```json
+{
+  "name": "Help! My payouts have been failing",
+  "created_at": "2026-09-17T15:02:45+00:00",
+  "auto_name": true,
+  "body": { "model": "jev-latest", "state": "...", "questions": {} },
+  "responses": [
+    { "timestamp": "...", "status": 200, "duration_ms": 979, "body": {} }
+  ]
+}
+```
+
+`auto_name` is present only while the name tracks the context, and `draft_questions`
+only while the questions buffer does not parse.
+
+## Development
+
+```sh
+uv sync                                  # install with dev dependencies
+uv run pytest                            # unit + end-to-end tests
+uv run ruff check . && uv run ruff format --check .
+uv run mypy
+uv run textual run --dev jev_preview.app:JevApp   # with the Textual devtools console
+```
+
+Tests drive the real TUI through Textual's `Pilot`, with HTTP mocked by `respx`, and
+never touch your own config or saved requests — `conftest.py` redirects both to a
+temporary directory.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

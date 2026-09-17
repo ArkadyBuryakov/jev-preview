@@ -1,0 +1,254 @@
+Screen {
+    background: $surface;
+}
+
+#statusbar {
+    height: 1;
+    background: $panel;
+    color: $text;
+}
+
+#panes {
+    height: 1fr;
+}
+
+#left {
+    width: 1fr;
+}
+
+EditPane, ResponsePane, QuestionsPane {
+    border: round $primary-darken-2;
+    padding: 0 1;
+    scrollbar-size-vertical: 1;
+    background: $surface;
+}
+
+EditPane:focus, ResponsePane:focus, QuestionsPane:focus {
+    border: round $accent;
+    background: $boost;
+}
+
+/* context gets a third of the left column, questions the rest */
+#context {
+    height: 1fr;
+}
+
+#questions {
+    height: 2fr;
+}
+
+#questions.invalid {
+    border: round $error;
+}
+
+/* edit mode: green border, and the cursor only shows while it is live */
+EditPane.editing, EditPane.editing:focus,
+QuestionsPane.editing, QuestionsPane.editing:focus {
+    border: round $success;
+}
+
+EditPane .text-area--cursor {
+    background: transparent;
+    color: transparent;
+}
+
+EditPane.editing .text-area--cursor {
+    background: $accent;
+    color: $surface;
+}
+
+#response {
+    width: 1fr;
+}
+
+ResponsePane > Static {
+    width: 100%;
+}
+
+#catalog, #prompt, #help {
+    width: 80;
+    max-width: 90%;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    border: round $accent;
+    background: $surface;
+}
+
+CatalogScreen, PromptScreen, HelpScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+#catalog-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#catalog-hint {
+    color: $text-muted;
+    margin-top: 1;
+}
+
+#catalog-list {
+    height: auto;
+    max-height: 24;
+    border: none;
+    background: $surface;
+}
+
+#prompt-input {
+    margin-top: 1;
+}
+
+/* ---- structured questions editor ---- */
+#qeditor {
+    height: auto;
+}
+
+.qcard {
+    height: auto;
+    border: round $primary-darken-2;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+.qhead {
+    height: 1;
+}
+
+.qfoot {
+    height: 1;
+    align-horizontal: right;
+}
+
+.qid {
+    width: 1fr;
+}
+
+.qtype {
+    width: 11;
+}
+
+.qdel {
+    width: auto;
+    min-width: 10;
+    color: $text-muted;
+}
+
+.row-del {
+    width: 3;
+    min-width: 3;
+    color: $text-muted;
+}
+
+.qdel:hover, .row-del:hover {
+    color: $error;
+}
+
+.field {
+    color: $text-muted;
+}
+
+.qinstr {
+    height: auto;
+    min-height: 1;
+    max-height: 7;
+    border: none;
+    padding: 0;
+    background: $boost;
+}
+
+.criteria, .row {
+    height: auto;
+}
+
+.row {
+    height: 1;
+}
+
+.bool-key {
+    width: 6;
+    color: $text-muted;
+}
+
+.lvl-num {
+    width: 2;
+    color: $text-muted;
+}
+
+.opt-key {
+    width: 14;
+}
+
+.opt-desc, .lvl-desc, .true-desc, .false-desc {
+    width: 1fr;
+}
+
+.add-opt, .add-lvl, .add-q {
+    width: auto;
+    min-width: 10;
+    color: $text-muted;
+}
+
+.advanced {
+    color: $warning;
+}
+
+/* compact controls have no border, so focus needs its own cue */
+#qeditor Input:focus, #qeditor TextArea:focus {
+    background: $primary 40%;
+}
+
+#qeditor Button:focus {
+    text-style: bold reverse;
+}
+
+#qeditor Select:focus > SelectCurrent {
+    text-style: bold reverse;
+}
+
+/* ---- onboarding and confirmation ---- */
+#apikey, #confirm {
+    width: 64;
+    max-width: 90%;
+    height: auto;
+    padding: 1 2;
+    border: round $accent;
+    background: $surface;
+}
+
+ApiKeyScreen, ConfirmScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+#apikey-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#apikey-help, #confirm-question {
+    margin-bottom: 1;
+}
+
+#apikey-input {
+    margin-bottom: 1;
+}
+
+#apikey-buttons, #confirm-buttons {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#apikey-buttons Button, #confirm-buttons Button {
+    margin-right: 2;
+}
+
+#apikey-footer, #confirm-hint {
+    color: $text-muted;
+}
+
+#catalog-filter {
+    margin-bottom: 1;
+}
