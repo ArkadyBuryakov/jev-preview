@@ -1,3 +1,6 @@
+<img width="943" height="566" alt="image" src="https://github.com/user-attachments/assets/def49d8b-2ef4-4265-ac6a-c0520ff75059" />
+
+
 # jev-preview
 
 **A TUI — a full-screen, keyboard-driven terminal application — for the
