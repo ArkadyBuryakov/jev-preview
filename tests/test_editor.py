@@ -81,7 +81,7 @@ class TestEditText:
             "p.write_text(p.read_text() + ' edited')\n"
         )
         monkeypatch.delenv("VISUAL", raising=False)
-        monkeypatch.setenv("EDITOR", f"{sys.executable} {script}")
+        monkeypatch.setenv("EDITOR", f'"{sys.executable}" "{script}"')
         assert editor.edit_text("original", ".txt") == "original edited"
 
     def test_temp_file_is_cleaned_up(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -117,7 +117,7 @@ def test_unicode_survives_the_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_pa
     script = tmp_path / "echo_editor.py"
     script.write_text("import sys\n")  # leaves the file untouched
     monkeypatch.delenv("VISUAL", raising=False)
-    monkeypatch.setenv("EDITOR", f"{sys.executable} {script}")
+    monkeypatch.setenv("EDITOR", f'"{sys.executable}" "{script}"')
     assert editor.edit_text("héllo — ünïcode ✓", ".txt") == "héllo — ünïcode ✓"
 
 

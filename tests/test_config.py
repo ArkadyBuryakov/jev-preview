@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 from pathlib import Path
 
@@ -19,6 +20,10 @@ from jev_preview.config import (
     config_path,
     mask_key,
     requests_dir,
+)
+
+posix_permissions = pytest.mark.skipif(
+    os.name == "nt", reason="Windows file modes do not carry POSIX permission bits"
 )
 
 
@@ -39,10 +44,15 @@ def test_round_trip(tmp_path: Path) -> None:
     assert reloaded.models == ("a", "b")
 
 
+def test_save_creates_the_directory(tmp_path: Path) -> None:
+    path = Config(api_key="sk-abc", path=tmp_path / "c" / "config.json").save()
+    assert path.parent.is_dir()
+
+
+@posix_permissions
 def test_save_is_owner_only(tmp_path: Path) -> None:
     path = Config(api_key="sk-abc", path=tmp_path / "c" / "config.json").save()
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    assert path.parent.is_dir()
 
 
 def test_save_omits_defaults(tmp_path: Path) -> None:
@@ -92,6 +102,7 @@ def test_malformed_file_is_survivable(tmp_path: Path, content: str) -> None:
     assert not config.has_api_key
 
 
+@posix_permissions
 def test_unreadable_file_is_survivable(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text('{"api_key": "sk-abc"}')

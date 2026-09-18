@@ -25,7 +25,11 @@ class EditorError(RuntimeError):
 
 def editor_command() -> list[str]:
     editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
-    parts = shlex.split(editor)
+    if os.name == "nt":
+        # A backslash is a path separator on Windows, not an escape character.
+        parts = [part.strip('"') for part in shlex.split(editor, posix=False)]
+    else:
+        parts = shlex.split(editor)
     if not parts:
         raise EditorError("$EDITOR is set to an empty command")
     return parts
