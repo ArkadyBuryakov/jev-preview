@@ -1,12 +1,15 @@
 # jev-preview
 
-A terminal sandbox for the [TypeSafe](https://docs.typesafe.ai) System One API
-(`POST https://api.typesafe.ai/v1/systemone`) — write a context, build the questions
-in a form rather than by hand, send, and read the answers as probability bars instead
-of raw JSON.
+**A TUI — a full-screen, keyboard-driven terminal application — for the
+[TypeSafe](https://docs.typesafe.ai) System One API**
+(`POST https://api.typesafe.ai/v1/systemone`).
 
-Every request you work on is saved as a JSON file holding its name, creation date,
-request body, and the full history of responses it has received.
+It is not a command-line tool that prints and exits: running `jev-preview` takes over
+your terminal with three live panes. You write a context, build the questions in a form
+rather than by hand, press <kbd>enter</kbd> to send, and read the answers as probability
+bars instead of raw JSON. Everything is driven by single keystrokes — vim-style
+`h` `j` `k` `l` to move between panes, `e` to edit the focused one, `q` to quit — and
+there are no subcommands to learn.
 
 ```
 ┌─ context ──────────┬─ response ─────────┐
@@ -19,19 +22,34 @@ request body, and the full history of responses it has received.
 └────────────────────┴────────────────────┘
 ```
 
+Every request you work on is saved as a JSON file holding its name, creation date,
+request body, and the full history of responses it has received, so the sandbox
+remembers what you tried and what came back.
+
+Built with [Textual](https://textual.textualize.io/). It needs a real terminal —
+any modern one will do (kitty, Alacritty, WezTerm, iTerm2, Windows Terminal, tmux) —
+and does not work through a pipe or in a non-interactive shell. The small handful of
+things that *are* plain command-line flags (`--set-key`, `--show-config`, `--version`)
+are listed below and never open the interface.
+
 ## Install
 
 ```sh
 pipx install jev-preview     # or: uv tool install jev-preview
-jev-preview
+jev-preview                  # launches the TUI
 ```
 
-The first run asks for your TypeSafe API key and stores it in your user config
-directory (`~/.config/jev-preview/config.json` on Linux), readable only by you.
-Declining the prompt exits without writing anything. Press <kbd>ctrl</kbd>+<kbd>k</kbd>
-at any time to change it.
+Both `jev-preview` and the shorter `jev` start the same application.
 
-To set the key without opening the TUI:
+To install from a clone of this repository instead, run `uv tool install .` (or
+`pipx install .`) from its root.
+
+The first run opens the TUI and asks for your TypeSafe API key, storing it in your
+user config directory (`~/.config/jev-preview/config.json` on Linux), readable only
+by you. Declining the prompt exits without writing anything. Press
+<kbd>ctrl</kbd>+<kbd>k</kbd> at any time to change it.
+
+To set the key from the shell instead, without opening the TUI:
 
 ```sh
 jev-preview --set-key sk-…
