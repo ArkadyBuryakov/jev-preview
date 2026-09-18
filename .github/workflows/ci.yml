@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -53,3 +53,67 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  package-smoke:
+    # Builds the wheel the AUR package would build and installs it into a
+    # clean venv — catches missing package data and broken entry points.
+    # The full makepkg + namcap + install check runs in publish_aur.yml,
+    # where a release tarball exists to build from.
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install system dependencies
+        run: |
+          pacman -Syu --noconfirm git python \
+            python-build python-installer python-wheel python-hatchling
+
+      - uses: actions/checkout@v4
+
+      - name: Build wheel (no isolation, like the PKGBUILD)
+        run: python -m build --wheel --no-isolation
+
+      - name: Install into a clean venv and smoke test
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install dist/*.whl
+          packaging/smoke-test /tmp/venv/bin
+
+  packaging-templates:
+    # The PKGBUILD and the formula are only built for real on release, so at
+    # least render them here and check they parse — a typo in either would
+    # otherwise surface after a tag is already pushed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render both templates at the current version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/jev_preview/__init__.py)
+          test -n "$version"
+          sed "s/@VERSION@/$version/g" packaging/AUR/PKGBUILD.template > /tmp/PKGBUILD
+          sha=0000000000000000000000000000000000000000000000000000000000000000
+          sed -e "s/@VERSION@/$version/g" -e "s/@SHA256@/$sha/g" \
+            packaging/homebrew/jev-preview.rb.template > /tmp/jev-preview.rb
+
+          # Assert what the rendered files must CONTAIN, not what they must
+          # not: a check for a leftover "@SHA256@" passes happily if someone
+          # renames the placeholder and the sed silently stops matching it.
+          grep -q "^pkgver=$version$" /tmp/PKGBUILD
+          grep -q "^  url \".*/v$version.tar.gz\"$" /tmp/jev-preview.rb
+          grep -q "^  sha256 \"$sha\"$" /tmp/jev-preview.rb
+          # The PKGBUILD keeps its checksum placeholder on purpose — updpkgsums
+          # fills it in publish_aur.yml, once there is a tarball to checksum —
+          # so assert the slot is there rather than absent.
+          grep -q "^sha256sums=('@SHA256@')$" /tmp/PKGBUILD
+
+          # Nothing else anywhere should still look like a placeholder.
+          if grep -n '@VERSION@' /tmp/PKGBUILD /tmp/jev-preview.rb; then
+            echo "::error::@VERSION@ survived rendering"; exit 1
+          fi
+
+      - name: They parse
+        run: |
+          bash -n /tmp/PKGBUILD
+          ruby -c /tmp/jev-preview.rb
+          # the shared smoke test the packages and the venv all run
+          bash -n packaging/smoke-test

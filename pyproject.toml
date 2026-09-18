@@ -1,6 +1,6 @@
 [project]
 name = "jev-preview"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A terminal sandbox for the TypeSafe (Jev) System One API"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,20 +16,21 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Testing",
     "Topic :: Utilities",
     "Typing :: Typed",
 ]
 dependencies = [
-    "textual[syntax]>=1.0",
+    "textual>=1.0",
     "httpx>=0.27",
     "platformdirs>=4.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/arkadyb/jev-preview"
-Repository = "https://github.com/arkadyb/jev-preview"
-Issues = "https://github.com/arkadyb/jev-preview/issues"
+Homepage = "https://github.com/ArkadyBuryakov/jev-preview"
+Repository = "https://github.com/ArkadyBuryakov/jev-preview"
+Issues = "https://github.com/ArkadyBuryakov/jev-preview/issues"
 
 [project.scripts]
 jev-preview = "jev_preview.cli:main"
@@ -50,11 +51,16 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "src/jev_preview/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/jev_preview"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+# packaging/ rides along so the sdist can run its own test suite:
+# tests/test_release_notes.py loads packaging/changelog/release-notes by path.
+include = ["src", "tests", "packaging", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

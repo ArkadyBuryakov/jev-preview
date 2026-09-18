@@ -34,8 +34,28 @@ are listed below and never open the interface.
 
 ## Install
 
+**Arch Linux** — from the [AUR](https://aur.archlinux.org/packages/jev-preview), with
+any helper:
+
+```sh
+paru -S jev-preview          # or: yay -S jev-preview
+```
+
+**macOS and Linux** — from the Homebrew tap:
+
+```sh
+brew install arkadyburyakov/tap/jev-preview
+```
+
+**Anywhere with Python 3.11+** — from [PyPI](https://pypi.org/project/jev-preview/):
+
 ```sh
 pipx install jev-preview     # or: uv tool install jev-preview
+```
+
+Then:
+
+```sh
 jev-preview                  # launches the TUI
 ```
 
@@ -209,6 +229,35 @@ uv run textual run --dev jev_preview.app:JevApp   # with the Textual devtools co
 Tests drive the real TUI through Textual's `Pilot`, with HTTP mocked by `respx`, and
 never touch your own config or saved requests — `conftest.py` redirects both to a
 temporary directory.
+
+### Releasing
+
+A release is one commit to `main`: bump `__version__` in
+`src/jev_preview/__init__.py` and add that version's section to
+[CHANGELOG.md](CHANGELOG.md). `pyproject.toml` has no version of its own —
+hatchling reads it from `__init__.py`, so the two can never disagree.
+
+On push, `release.yml` tags `v<version>` and creates the GitHub release with that
+changelog section as its notes. Publishing to the three channels then happens on
+`release: published`, in parallel and independently:
+
+| workflow | channel | built from |
+| --- | --- | --- |
+| `publish_pypi.yml` | [PyPI](https://pypi.org/project/jev-preview/) | the sdist and wheel, trusted publishing — no token |
+| `publish_aur.yml` | [AUR](https://aur.archlinux.org/packages/jev-preview) | `packaging/AUR/PKGBUILD.template` |
+| `publish_homebrew.yml` | the `arkadyburyakov/tap` tap | `packaging/homebrew/jev-preview.rb.template` |
+
+Each renders its template with the version and the release tarball's checksum,
+builds the package, and runs `packaging/smoke-test` against the *installed* result —
+which starts the TUI headless, so a package that installed without `app.tcss`, or
+against a `textual` too old, fails before it is published. Nothing is committed back
+to this repository; the rendered PKGBUILD and formula exist only inside the workflow
+run and in the AUR and tap repositories.
+
+Changing the runtime dependencies in `pyproject.toml` means updating both packaging
+templates: the Arch `depends=()` array, and the Homebrew formula's pinned `resource`
+blocks (regenerate those with `brew update-python-resources` against the rendered
+formula).
 
 ## License
 

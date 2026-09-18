@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Print one release's section of CHANGELOG.md, for use as GitHub release notes.
+
+CHANGELOG.md is the only changelog written by hand, and a release's own
+section of it is the body release.yml gives the GitHub release. Keeping that
+here rather than in a shell one-liner is what lets tests/test_release_notes.py
+hold it to the format.
+
+  packaging/changelog/release-notes 0.1.0
+
+Exits non-zero when there is no section for that version, which release.yml
+takes as "fall back to generated notes".
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+CHANGELOG = Path(__file__).resolve().parent.parent.parent / "CHANGELOG.md"
+
+# "## [0.1.0] - 2026-09-18", the Keep a Changelog release heading. The
+# brackets are optional so an unlinked "## 0.1.0" works too.
+HEADING = re.compile(r"^## +\[?(?P<version>[^]\s]+)]?(?: +- +\S+)? *$", re.MULTILINE)
+
+# The link-reference definitions Keep a Changelog keeps at the foot of the
+# file ("[0.1.0]: https://…"). They belong to the document, not to a release.
+LINK_DEF = re.compile(r"^\[[^]]+]: +\S+ *$")
+
+
+def section(text: str, version: str) -> str | None:
+    """That version's release body, or None if the changelog has no section."""
+    matches = list(HEADING.finditer(text))
+    for index, match in enumerate(matches):
+        if match["version"] != version:
+            continue
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        body = text[match.end() : end]
+        lines = [line for line in body.splitlines() if not LINK_DEF.match(line)]
+        return "\n".join(lines).strip("\n")
+    return None
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 1:
+        print(f"usage: {Path(sys.argv[0]).name} VERSION", file=sys.stderr)
+        return 2
+    version = argv[0]
+    body = section(CHANGELOG.read_text(), version)
+    if not body:
+        print(f"{CHANGELOG}: no section for {version}", file=sys.stderr)
+        return 1
+    print(body)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

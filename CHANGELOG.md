@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Published to PyPI, the AUR (`jev-preview`) and a Homebrew tap, each built and
+  smoke-tested on release before it is pushed.
+
+### Changed
+
+- Dropped the `textual[syntax]` extra: nothing here builds a tree-sitter
+  `TextArea`, so it only added sixteen unused grammar wheels to every install.
+  This also lets the Arch package depend solely on official-repository packages.
+
 ## [0.1.0] - 2026-09-18
 
 First public release.
