@@ -1,0 +1,4 @@
+scripts:
+  dev: uv run jev-preview
+  install: uv tool install .
+  uninstall: uv tool uninstall jev-preview
