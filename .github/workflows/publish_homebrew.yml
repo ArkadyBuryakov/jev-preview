@@ -25,7 +25,7 @@ jobs:
       - name: Render formula from template
         run: |
           version="${RELEASE_VERSION#v}"
-          url="https://github.com/ArkadyBuryakov/jev-preview/archive/v$version.tar.gz"
+          url="https://github.com/ArkadyBuryakov/jev-preview/archive/refs/tags/v$version.tar.gz"
           curl -fsSL "$url" -o /tmp/jev-preview.tar.gz
           sha256=$(shasum -a 256 /tmp/jev-preview.tar.gz | cut -d' ' -f1)
           cd packaging/homebrew
