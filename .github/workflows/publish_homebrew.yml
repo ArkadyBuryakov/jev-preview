@@ -1,0 +1,76 @@
+name: Publish to Homebrew tap
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish (e.g. 0.1.1)"
+        required: true
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    env:
+      RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+    environment:
+      name: homebrew-tap
+      url: https://github.com/ArkadyBuryakov/homebrew-tap
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render formula from template
+        run: |
+          version="${RELEASE_VERSION#v}"
+          url="https://github.com/ArkadyBuryakov/jev-preview/archive/v$version.tar.gz"
+          curl -fsSL "$url" -o /tmp/jev-preview.tar.gz
+          sha256=$(shasum -a 256 /tmp/jev-preview.tar.gz | cut -d' ' -f1)
+          cd packaging/homebrew
+          sed -e "s/@VERSION@/$version/g" -e "s/@SHA256@/$sha256/g" \
+            jev-preview.rb.template > jev-preview.rb
+
+      - name: Build, test, and smoke test
+        run: |
+          # Homebrew >= 4.6.4 refuses to install from a bare file path —
+          # formulas must live in a tap, so stage ours in a throwaway one.
+          brew tap-new --no-git arkadyburyakov/test
+          cp packaging/homebrew/jev-preview.rb "$(brew --repository arkadyburyakov/test)/Formula/"
+          brew style arkadyburyakov/test/jev-preview
+          brew install --build-from-source arkadyburyakov/test/jev-preview
+          brew test arkadyburyakov/test/jev-preview
+          # The same checks CI runs against a venv, now against the formula's.
+          packaging/smoke-test "$(brew --prefix)/bin" \
+            "$(brew --prefix)/opt/jev-preview/libexec/bin/python"
+
+      - name: Push to tap
+        env:
+          TAP_SSH_PRIVATE_KEY: ${{ secrets.TAP_SSH_PRIVATE_KEY }}
+        run: |
+          version="${RELEASE_VERSION#v}"
+          # Host keys are pinned rather than keyscanned (same policy as the
+          # AUR workflow); these are GitHub's published SSH fingerprints.
+          mkdir -p /tmp/ssh
+          printf '%s\n' "$TAP_SSH_PRIVATE_KEY" > /tmp/ssh/tap
+          chmod 600 /tmp/ssh/tap
+          cat > /tmp/ssh/known_hosts <<'KEYS'
+          github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          KEYS
+          export GIT_SSH_COMMAND="ssh -i /tmp/ssh/tap -o UserKnownHostsFile=/tmp/ssh/known_hosts -o IdentitiesOnly=yes"
+          git config --global user.name "Arkady Buryakov"
+          git config --global user.email "arkady@buryakov.pro"
+          git clone git@github.com:ArkadyBuryakov/homebrew-tap.git /tmp/tap
+          cd /tmp/tap
+          git checkout main 2>/dev/null || git checkout -b main
+          mkdir -p Formula
+          cp "$GITHUB_WORKSPACE/packaging/homebrew/jev-preview.rb" Formula/jev-preview.rb
+          git add Formula/jev-preview.rb
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+          else
+            git commit -m "jev-preview $version"
+            git push origin main
+          fi

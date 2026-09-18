@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Smoke test an installed jev-preview, wherever it was installed from.
+#
+#   packaging/smoke-test                    # jev-preview, jev, python3 from $PATH
+#   packaging/smoke-test /tmp/venv/bin      # a venv (or /usr/bin for the Arch package)
+#   packaging/smoke-test "$(brew --prefix)/bin" .../libexec/bin/python
+#
+# The last check is the one that earns its keep: it starts the real TUI
+# headless, so a wheel that shipped without app.tcss, or against a textual
+# too old for the widgets used here, fails at package time instead of on a
+# user's first launch.
+set -euo pipefail
+
+bin=${1:-}
+if [[ -n $bin ]]; then
+  jev_preview=$bin/jev-preview
+  jev=$bin/jev
+  python=${2:-$([[ -x $bin/python ]] && echo "$bin/python" || echo python3)}
+else
+  jev_preview=jev-preview
+  jev=jev
+  python=${2:-python3}
+fi
+
+version=$("$jev_preview" --version)
+echo "$version"
+[[ $version == "jev-preview "* ]]
+# the short alias is the same program
+[[ $("$jev" --version) == "$version" ]]
+
+# A throwaway config, so the test never reads or writes the real one.
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+export JEV_CONFIG_DIR=$tmp/config JEV_REQUESTS_DIR=$tmp/requests
+
+"$jev_preview" --set-key sk-smoke-test | grep -q "$tmp/config"
+"$jev_preview" --show-config | grep -q 'api key .*config file'
+
+"$python" - <<'PY'
+import asyncio, os
+from pathlib import Path
+
+import jev_preview.app
+from jev_preview.app import JevApp
+from jev_preview.config import Config, config_path
+
+# The stylesheet is package data, loaded by name relative to the module.
+stylesheet = Path(jev_preview.app.__file__).parent / JevApp.CSS_PATH
+assert stylesheet.is_file(), f"{stylesheet} missing from the install"
+
+# The key the shell step above stored is readable only by its owner.
+# (stat(1) spells this differently on Linux and macOS; Python does not.)
+mode = config_path().stat().st_mode & 0o777
+assert mode == 0o600, f"{config_path()} is {mode:o}, expected 600"
+
+
+async def main() -> None:
+    directory = Path(os.environ["JEV_REQUESTS_DIR"])
+    app = JevApp(config=Config.load(), directory=directory)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert app.screen is not None
+
+
+asyncio.run(main())
+print("headless TUI start ok")
+PY
+echo "smoke test ok"

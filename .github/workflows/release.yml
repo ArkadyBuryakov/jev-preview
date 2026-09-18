@@ -1,19 +1,42 @@
 name: Release
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write  # trusted publishing; no API token needed
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv build
-      - run: uvx twine check dist/*
-      - uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Read package version
+        id: version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/jev_preview/__init__.py)
+          if [ -z "$version" ]; then
+            echo "Could not parse __version__ from src/jev_preview/__init__.py" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and release if missing
+        env:
+          # Must be a PAT, not github.token: releases created with the default
+          # token do not trigger the release-published publisher workflows.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "Tag $tag already exists — nothing to release."
+          else
+            # The release's own section of CHANGELOG.md is its notes; a
+            # version that has none falls back to the commit list.
+            notes=$(mktemp)
+            if packaging/changelog/release-notes "$version" > "$notes"; then
+              gh release create "$tag" --target "$GITHUB_SHA" --notes-file "$notes"
+            else
+              gh release create "$tag" --target "$GITHUB_SHA" --generate-notes
+            fi
+          fi
